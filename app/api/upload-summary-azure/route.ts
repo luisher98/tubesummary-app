@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const API_URL = getApiUrl();
-    const response = await fetch(`${API_URL}/api/upload-summary-azure`, {
+    const response = await fetch(`${API_URL}/api/summary/upload/summary`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

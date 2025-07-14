@@ -1,5 +1,6 @@
 import { getApiUrl } from './env';
 import type { SummaryProcessingUpdate } from '@/types';
+import { analyzeNetworkError, createServerDownError } from './utils/networkError';
 
 function isSummaryUpdate(value: unknown): value is SummaryProcessingUpdate {
   return (
@@ -19,7 +20,7 @@ function isSummaryUpdate(value: unknown): value is SummaryProcessingUpdate {
 export default async function* getVideoSummary(url: string, words: number): AsyncGenerator<SummaryProcessingUpdate> {
   const API_URL = getApiUrl();
   const eventSource = new EventSource(
-    `${API_URL}/api/youtube/summary/stream?url=${encodeURIComponent(url)}&words=${words}`
+    `${API_URL}/api/summary/youtube/stream?url=${encodeURIComponent(url)}&words=${words}`
   );
 
   try {
@@ -39,7 +40,8 @@ export default async function* getVideoSummary(url: string, words: number): Asyn
         };
 
         eventSource.onerror = (error: Event) => {
-          reject(new Error(error instanceof ErrorEvent ? error.message : 'EventSource error'));
+          const errorMessage = error instanceof ErrorEvent ? error.message : 'EventSource connection failed';
+          reject(createServerDownError());
         };
       });
 

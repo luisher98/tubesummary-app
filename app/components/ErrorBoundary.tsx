@@ -2,6 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import { analyzeNetworkError } from '@/lib/utils/networkError';
 
 interface Props {
   children: ReactNode;
@@ -27,6 +28,8 @@ export function ErrorBoundary({ children, fallback }: Props) {
   }, []);
 
   if (error) {
+    const networkError = analyzeNetworkError(error);
+    
     return (
       <div 
         role="alert" 
@@ -35,8 +38,13 @@ export function ErrorBoundary({ children, fallback }: Props) {
       >
         <h2 className="mb-2 font-semibold">Something went wrong</h2>
         <p className="text-red-700 dark:text-red-300">
-          {error.message || 'An unexpected error occurred'}
+          {networkError.userMessage}
         </p>
+        {networkError.isServerDown && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            Tip: Make sure the backend server is running on the configured port.
+          </p>
+        )}
         {fallback}
       </div>
     );

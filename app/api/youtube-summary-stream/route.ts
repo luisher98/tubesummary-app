@@ -57,10 +57,10 @@ async function* fetchSummaryUpdates(
 
   // First, verify the video info
   try {
-    console.log('Fetching video info from:', `${API_URL}/api/video/metadata?url=${encodeURIComponent(url)}`);
+    console.log('Fetching video info from:', `${API_URL}/api/summary/youtube/metadata?url=${encodeURIComponent(url)}`);
     
     const infoResponse = await fetch(
-      `${API_URL}/api/video/metadata?url=${encodeURIComponent(url)}`,
+      `${API_URL}/api/summary/youtube/metadata?url=${encodeURIComponent(url)}`,
       {
         headers: {
           'Accept': 'application/json',
@@ -82,10 +82,10 @@ async function* fetchSummaryUpdates(
 
   // Then proceed with the summary generation
   try {
-    console.log('Fetching summary from:', `${API_URL}/api/youtube-summary-sse?url=${encodeURIComponent(url)}&words=${words}`);
+    console.log('Fetching summary from:', `${API_URL}/api/summary/youtube/stream?url=${encodeURIComponent(url)}&words=${words}`);
     
     const response = await fetch(
-      `${API_URL}/api/youtube-summary-sse?url=${encodeURIComponent(url)}&words=${words}`,
+      `${API_URL}/api/summary/youtube/stream?url=${encodeURIComponent(url)}&words=${words}`,
       {
         headers: {
           'Accept': 'text/event-stream',

@@ -7,6 +7,9 @@ import Form from './Form';
 import FileUploadForm from './FileUploadForm';
 import type { SummaryProcessingUpdate, VideoInfo } from '@/types';
 import { getApiUrl } from '@/lib/env';
+import { analyzeNetworkError } from '@/lib/utils/networkError';
+import { validateConnection } from '@/lib/utils/connectionChecker';
+import ConnectionStatus from './ConnectionStatus';
 
 type InputType = 'url' | 'file';
 
@@ -47,10 +50,13 @@ export default function InputSelector() {
     setVideoInfo(null);
 
     try {
+      // First check if backend is available
+      await validateConnection();
+      
       const API_URL = getApiUrl();
       
       // First fetch video info
-      const infoResponse = await fetch(`${API_URL}/api/video/metadata?url=${encodeURIComponent(url)}`, {
+      const infoResponse = await fetch(`${API_URL}/api/summary/youtube/metadata?url=${encodeURIComponent(url)}`, {
         headers: {
           'Accept': 'application/json',
         },
@@ -71,7 +77,7 @@ export default function InputSelector() {
 
       // Then start the summary stream
       const response = await fetch(
-        `${API_URL}/api/youtube/summary/stream?url=${encodeURIComponent(url)}&words=${numberOfWords}`,
+        `${API_URL}/api/summary/youtube/stream?url=${encodeURIComponent(url)}&words=${numberOfWords}`,
         {
           headers: {
             'Accept': 'text/event-stream',
@@ -114,7 +120,18 @@ export default function InputSelector() {
         }
       }
     } catch (error) {
-      console.error('Error:', error);
+      const networkError = analyzeNetworkError(error);
+      console.error('Error:', networkError.technicalMessage);
+      
+      // Add the error message to summary so user sees it
+      setSummary(prev => [...prev, {
+        status: 'error',
+        message: networkError.userMessage,
+        type: 'error',
+        progress: 0,
+        timestamp: Date.now()
+      }]);
+      
       setIsLoading(false);
       setIsVideoUnavailable(true);
       setVideoInfo(null);
@@ -140,6 +157,11 @@ export default function InputSelector() {
             " Just paste a YouTube URL and let AI do the magic." :
             " Upload your video and transform it into clear, readable text."}
         </p>
+        
+        {/* Connection Status */}
+        <div className="mt-4 flex justify-center">
+          <ConnectionStatus className="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800" />
+        </div>
       </div>
 
       <div className="mt-8">

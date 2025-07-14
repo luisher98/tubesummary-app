@@ -33,10 +33,10 @@ async function handleUploadUrlRequest(request: NextRequest, params: { fileName: 
   }
 
   const API_URL = getApiUrl();
-  console.log('Calling backend API:', `${API_URL}/api/azure/upload/url`);
+  console.log('Calling backend API:', `${API_URL}/api/storage/azure/upload/initiate`);
   
   try {
-    const response = await fetch(`${API_URL}/api/azure/upload/url`, {
+    const response = await fetch(`${API_URL}/api/storage/azure/upload/initiate`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',

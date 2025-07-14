@@ -1,5 +1,6 @@
 import { getApiUrl } from './env';
 import type { VideoInfo } from '@/types';
+import { analyzeNetworkError } from './utils/networkError';
 
 interface ApiResponse {
   success: boolean;
@@ -20,7 +21,7 @@ interface ApiResponse {
 export default async function getInfo(url: string): Promise<VideoInfo | null> {
   try {
     const API_URL = getApiUrl();
-    const response = await fetch(`${API_URL}/api/video/metadata?url=${encodeURIComponent(url)}`, {
+    const response = await fetch(`${API_URL}/api/summary/youtube/metadata?url=${encodeURIComponent(url)}`, {
       headers: {
         "Accept": "application/json",
       },
@@ -44,7 +45,14 @@ export default async function getInfo(url: string): Promise<VideoInfo | null> {
       duration: data.duration
     };
   } catch (error) {
-    console.error('Error fetching video info:', error);
+    const networkError = analyzeNetworkError(error);
+    console.error('Error fetching video info:', networkError.technicalMessage);
+    
+    // If it's a server down error, throw it so the caller can handle it appropriately
+    if (networkError.isServerDown) {
+      throw new Error(networkError.userMessage);
+    }
+    
     return null;
   }
 }

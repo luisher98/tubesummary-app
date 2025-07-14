@@ -10,6 +10,8 @@ import getInfo from "@/lib/getVideoInfo";
 import Form from "./Form";
 import getVideoStatus from "@/lib/getVideoStatus";
 import { getApiUrl } from "@/lib/env";
+import { analyzeNetworkError } from "@/lib/utils/networkError";
+import { validateConnection } from "@/lib/utils/connectionChecker";
 
 export default function InputField() {
   const [url, setUrl] = useState("");
@@ -53,17 +55,10 @@ export default function InputField() {
       });
 
       // Create a promise to handle the XHR request
-      const uploadPromise = new Promise<Response>((resolve, reject) => {
+      const uploadPromise = new Promise<string>((resolve, reject) => {
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            const responseBody = xhr.response as string;
-            resolve(new Response(responseBody, {
-              status: xhr.status,
-              statusText: xhr.statusText,
-              headers: new Headers({
-                'Content-Type': 'text/event-stream'
-              })
-            }));
+            resolve(xhr.responseText);
           } else {
             reject(new Error(`Upload failed with status ${xhr.status}`));
           }
@@ -72,58 +67,48 @@ export default function InputField() {
 
         // Start the upload
         const API_URL = getApiUrl();
-        xhr.open('POST', `${API_URL}/api/upload/summary/stream?words=${numberOfWords}`);
+        xhr.open('POST', `${API_URL}/api/summary/upload/summary?words=${numberOfWords}`);
         xhr.setRequestHeader('Accept', 'text/event-stream');
         xhr.responseType = 'text';
         xhr.send(formData);
       });
 
-      // Wait for upload to complete
-      const response = await uploadPromise;
+      // Wait for upload to complete and process SSE response
+      const responseText = await uploadPromise;
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
+      // Parse SSE response
+      const lines = responseText.split('\n');
+      
+      for (const line of lines) {
+        if (line.trim() === '' || !line.startsWith('data: ')) continue;
+        
+        try {
+          const jsonStr = line.slice(6); // Remove 'data: ' prefix
+          const update = JSON.parse(jsonStr) as SummaryProcessingUpdate;
+          setSummary((prev: SummaryProcessingUpdate[]) => [...prev, update]);
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Failed to get reader from response body');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (line.trim() === '' || !line.startsWith('data: ')) continue;
-            
-            try {
-              const jsonStr = line.slice(6); // Remove 'data: ' prefix
-              const update = JSON.parse(jsonStr) as SummaryProcessingUpdate;
-              setSummary((prev: SummaryProcessingUpdate[]) => [...prev, update]);
-
-              if (update.status === 'error') {
-                setIsVideoUnavailable(true);
-                break;
-              }
-            } catch {
-              // Ignore parsing errors
-            }
+          if (update.status === 'error') {
+            setIsVideoUnavailable(true);
+            setIsLoading(false);
+            setSelectedFile(null);
+            setUploadProgress(0);
+            return;
           }
+          
+          if (update.status === 'done') {
+            setIsLoading(false);
+            setSelectedFile(null);
+            setUploadProgress(100);
+            break;
+          }
+        } catch (parseError) {
+          console.error('Error parsing SSE data:', parseError, 'Line:', line);
+          // Continue processing other lines
         }
       }
     } catch (error) {
       console.error('File upload error:', error);
       setIsVideoUnavailable(true);
-    } finally {
       setIsLoading(false);
       setSelectedFile(null);
       setUploadProgress(0);
@@ -147,6 +132,9 @@ export default function InputField() {
     }
 
     try {
+      // First check if backend is available
+      await validateConnection();
+      
       // Check video status
       const status = await getVideoStatus(url);
       
@@ -177,6 +165,18 @@ export default function InputField() {
         }
       }
     } catch (error) {
+      const networkError = analyzeNetworkError(error);
+      console.error('Error:', networkError.technicalMessage);
+      
+      // Add the error message to summary so user sees it
+      setSummary((prev: SummaryProcessingUpdate[]) => [...prev, {
+        status: 'error',
+        message: networkError.userMessage,
+        type: 'error',
+        progress: 0,
+        timestamp: Date.now()
+      }]);
+      
       setIsVideoUnavailable(true);
     } finally {
       setIsLoading(false);
